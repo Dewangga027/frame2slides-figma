@@ -1,7 +1,7 @@
 # PRD — Frame2Slides
 
-Tanggal: 14 Oktober 2026  
-Status: Draft untuk implementasi; keputusan terbuka belum disetujui  
+Tanggal: 15 Oktober 2026  
+Status: Baseline keputusan D01–D16 dan OQ06/OQ07/OQ09/OQ10 disetujui; OQ08 benchmark pending; OQ11 open  
 Produk: Plugin Figma privat untuk ekspor PDF dan PowerPoint (.pptx)
 
 ## Dasar spesifikasi dan batas bukti
@@ -10,7 +10,7 @@ Dokumen ini mengikuti struktur skill mattpocock `/to-spec`, dengan tambahan scop
 
 Sumber: permintaan pengguna pada chat Codex ini dan percakapan **Membuat Plugin Figma Pribadi**, ID `6acf64bb-273c-83ec-bb55-b0fbff687aaf`. Pengambilan percakapan mengembalikan lima turn pengguna dan tidak menyediakan halaman lebih lama. Isi jawaban asisten hanya berupa penanda referensi. Karena itu dokumen ini **belum merupakan ekstraksi terverifikasi dari seluruh diskusi asli**.
 
-Pesan sumber yang dapat dibaca mengonfirmasi Smart Hybrid Conversion, Fixed Layout untuk nested Auto Layout, Select Frames + Drag & Drop, dan penggantian JPEG dengan PNG. Permintaan terbaru secara eksplisit mengunci keputusan tambahan di bawah. Detail operasional yang ditambahkan untuk membuat PRD implementable berstatus **usulan spesifikasi**, bukan persetujuan historis. Bila berbeda dengan diskusi asli yang belum dapat dibaca, perlu direkonsiliasi.
+Pesan sumber yang dapat dibaca mengonfirmasi Smart Hybrid Conversion, Fixed Layout untuk nested Auto Layout, Select Frames + Drag & Drop, dan penggantian JPEG dengan PNG. Permintaan terbaru secara eksplisit mengunci keputusan tambahan di bawah. Detail operasional yang telah disetujui pada 15 Oktober 2026 dicatat sebagai **baseline approved**; rincian lain tetap **usulan spesifikasi**, bukan persetujuan historis. Bila berbeda dengan diskusi asli yang belum dapat dibaca, perlu direkonsiliasi.
 
 ## Problem Statement
 
@@ -37,23 +37,44 @@ PPTX memakai posisi dan ukuran akhir yang terhitung di Figma. Nested Auto Layout
 | D09 | PDF + PPTX | Keduanya berada dalam scope MVP. |
 | D10 | Non-destructive | Ekspor tidak mengubah node, style, selection, struktur, atau layout dokumen sumber. |
 | D11 | Local-only | Pemrosesan ekspor tidak mengunggah desain, asset, teks, atau hasil ke layanan eksternal. |
+| D12 | Standard 16:9 Widescreen | PPTX dan PDF memakai kanvas referensi 1920×1080 px; frame dengan rasio berbeda di-*fit* proporsional tanpa distorsi/crop diam-diam, dengan padding/background sesuai. |
+| D13 | Node-level fallback compositing (Opsi A) | Raster PNG ber-alpha pada node terkecil yang memerlukan fallback; native text/shape lain, termasuk yang berada di bawahnya, tetap editable. Ketidakmampuan compositing independen wajib dilaporkan. |
+| D14 | Flatten structure di PPTX | Semua objek ditempatkan di level slide mengikuti absolute z-order/paint order tanpa nested group shapes; geometri nested Auto Layout diselesaikan absolut. |
+| D15 | Fallback font default | Jika font asli tidak tersedia/kompatibel, gunakan Arial/Calibri, pertahankan styling sedekat mungkin, dan catat substitusi dalam warning report. |
+| D16 | Target kompatibilitas terkunci | PowerPoint Desktop 2016+ Windows, M365 Windows/Mac, Google Slides (import PPTX), dan PDF viewer universal; target dukungan harus dibuktikan melalui uji, bukan dianggap sudah lulus. |
+
+
+### Baseline keputusan kualitas dan distribusi (15 Oktober 2026)
+
+| ID | Status | Ketentuan |
+| --- | --- | --- |
+| OQ06 | APPROVED | Posisi dan dimensi objek ±1 px pada koordinat sumber ternormalisasi; rotasi ±0,1°; jumlah baris teks sama; target SSIM ≥0,98 pada lingkungan render konsisten; z-order benar dan tanpa clipping leakage. Target pengujian, bukan hasil benchmark. |
+| OQ07 | APPROVED | Raster PNG lossless ber-alpha; default 2x, pilihan UI 1x/2x/3x; placement fisik tidak berubah; limit Figma/pixel budget memunculkan warning atau controlled failure. |
+| OQ08 | BENCHMARK PENDING | Fixture 1/10/25/50 slide; ukur durasi PPTX/PDF, file size, peak memory jika terukur, pixel usage, failure, fidelity dan editability. Belum ada hard limit/target performa final. |
+| OQ09 | APPROVED | Distribusi privat via Figma Development Plugin; update melalui Git dan local build; tanpa backend; default filename `Frame2Slides_<FirstFrameName>_<YYYYMMDD>.pptx` / `.pdf`, sanitasi karakter tidak valid. FirstFrameName mengikuti urutan ekspor final. |
+| OQ10 | APPROVED | PDF visual-first: satu frame per halaman 16:9, urutan sama, alpha/mask/clipping/background sesuai; selectable text bila didukung pipeline, tidak wajib pada raster; metode komposisi final dipilih setelah proof-of-concept. |
+| OQ11 | OPEN | Rekonsiliasi seluruh percakapan dengan PRD belum diverifikasi. |
+
+**Fixture wajib OQ06:** basic/mixed-style/multiline text, simple shapes, nested Auto Layout, overlapping layers, image crop/mask, transparency, rounded clipping, effects, component instances, dan multiple selected frames. Ukur SSIM dengan resolusi dan rendering environment konsisten; catat perbedaan antialiasing/font terpisah.
+
+**Kebijakan kegagalan OQ08:** tidak boleh diam-diam menghilangkan node; error actionable, progress sesuai tahap, dan output parsial/rusak tidak boleh dilaporkan sukses. Batas kapasitas ditetapkan setelah benchmark dan menjadi release gate MVP.
 
 ## Scope MVP
 
 ### Termasuk
 
-- Satu frame terpilih menjadi satu slide/page, dengan batas slide berasal dari frame tersebut.
+- Satu frame terpilih menjadi satu slide/page 16:9 (referensi 1920×1080 px); konten sumber dengan rasio berbeda di-fit proporsional, tanpa distorsi atau crop diam-diam.
 - Daftar frame dengan nama, thumbnail, urutan, serta drag & drop.
 - Ekspor satu atau beberapa frame ke PPTX dan PDF.
 - Konversi teks, simple shapes, serta frame sederhana yang memenuhi matriks native.
 - Fixed Layout untuk Auto Layout bertingkat.
-- PNG fallback 2x, alpha, preservasi z-order, dan laporan objek yang dirasterisasi.
+- PNG fallback lossless ber-alpha (default 2x; pilihan 1x/2x/3x), preservasi z-order, dan laporan objek yang dirasterisasi.
 - Validasi sebelum ekspor, progress, error yang dapat ditindaklanjuti, dan penyimpanan file lokal.
 - Pemeriksaan visual dan editability terhadap kumpulan fixture yang disepakati.
 
-### Batas scope yang diusulkan
+### Batas scope dan keputusan teknis
 
-Kebijakan ukuran frame berbeda, compositing fallback yang melibatkan objek lain, dan grouping belum dipilih. Implementasi bagian tersebut harus menunggu keputusan; dukungan MVP tidak boleh diklaim lengkap sebelum acceptance criteria terkait ditetapkan. Pengembangan pipeline dasar dengan frame berukuran sama dan fallback independen tetap dapat dilakukan.
+Ukuran slide, node-level compositing dan flattened grouping telah dikunci pada D12–D14. Keterbatasan node-level compositing yang tidak dapat direproduksi tanpa melibatkan backdrop/sibling harus dilaporkan sebagai hambatan atau warning terukur, bukan diam-diam dirasterisasi sebagai seluruh frame. Hard limit kapasitas tetap menunggu benchmark OQ08; kelengkapan rekonsiliasi tetap menunggu OQ11.
 
 ## User Stories
 
@@ -78,7 +99,7 @@ Kebijakan ukuran frame berbeda, compositing fallback yang melibatkan objek lain,
 
 ## Implementation Decisions
 
-Semua rincian dalam bagian ini merupakan usulan implementasi kecuali yang merujuk keputusan D01–D11. Tidak ada library, versi aplikasi, atau batas kapasitas yang dianggap sudah dipilih.
+Keputusan D01–D16 serta baseline OQ06/OQ07/OQ09/OQ10 sudah disetujui. Rincian lainnya adalah usulan implementasi. Library PDF final dan batas kapasitas belum dipilih; target aplikasi D16 tidak menyatakan hasil pengujian sudah lulus.
 
 ### Alur pengguna dan state
 
@@ -93,7 +114,7 @@ State yang diperlukan: daftar kosong, siap, preflight, ekspor berlangsung, berha
 
 ### Seams dan tanggung jawab modul
 
-Belum ada codebase atau prior art pengujian di workspace ini. Usulan seam utama adalah **permintaan ekspor berisi snapshot frame berurutan → file keluaran dan laporan konversi**. UI dan integrasi Figma diuji pada batas yang sama melalui fixture integrasi; unit test internal hanya untuk algoritma yang membutuhkan diagnosis khusus.
+Implementasi plugin sedang berjalan secara bertahap; status pengujian codebase tidak diverifikasi oleh dokumen ini. Usulan seam utama adalah **permintaan ekspor berisi snapshot frame berurutan → file keluaran dan laporan konversi**. UI dan integrasi Figma diuji pada batas yang sama melalui fixture integrasi; unit test internal hanya untuk algoritma yang membutuhkan diagnosis khusus.
 
 Tanggung jawab logis:
 
@@ -102,9 +123,9 @@ Tanggung jawab logis:
 | Selection & ordering | ID frame dan tindakan urutan | Daftar frame berurutan yang tervalidasi. |
 | Snapshot adapter | Node Figma terpilih | Scene immutable, geometri final, style, text runs, asset references, hierarchy dan paint order. |
 | Conversion planner | Snapshot dan kemampuan target | Native/raster plan, batas fallback, warning dan error. |
-| Raster adapter | Area fallback | PNG ber-alpha 2x, pixel dimensions dan placement bounds. |
+| Raster adapter | Node fallback | PNG lossless ber-alpha 1x/2x/3x (default 2x), pixel dimensions dan placement bounds; compositing node independen. |
 | PPTX writer | Plan dan assets | Slide objects native/gambar dalam urutan yang benar. |
-| PDF writer | Frame snapshot dan assets | Page sesuai desain dan urutan; teknik vector/raster PDF belum dikunci. |
+| PDF writer | Frame snapshot dan assets | Satu halaman 16:9 per frame, visual-first, alpha/mask/background konsisten; teknik vector/raster final menunggu proof-of-concept. |
 | Export coordinator | Daftar, format, konfigurasi | Progress, file bytes dan laporan per slide; tidak memodifikasi sumber. |
 
 Kontrak snapshot harus menyertakan ID sumber, nama, ukuran frame, transformasi, visibility, opacity, clipping/mask, serta urutan render. Kontrak hasil harus menyertakan format, file bytes, jumlah slide/page, dan laporan berisi ID node, jenis konversi, serta alasan warning/fallback. Jangan menyimpan data desain lintas sesi tanpa kebutuhan yang disetujui.
@@ -121,16 +142,16 @@ Kontrak snapshot harus menyertakan ID sumber, nama, ukuran frame, transformasi, 
 | Efek, vector, mask, blend, atau style yang gagal dipetakan dengan fidelity memadai | PNG fallback; alasan dicatat. |
 | Node tidak terlihat | Tidak dirender; jangan membuatnya terlihat pada hasil. |
 
-Daftar dukungan native harus eksplisit dan diuji. Jangan menganggap semua teks, shapes, frame, atau text styling selalu dapat diekspor native. Teks pada kasus dasar yang didukung tidak boleh dirasterisasi hanya demi menyederhanakan implementasi. Font tidak tersedia/tidak cocok harus menghasilkan warning; strategi substitusi versus fallback masih perlu ditetapkan.
+Daftar dukungan native harus eksplisit dan diuji. Jangan menganggap semua teks, shapes, frame, atau text styling selalu dapat diekspor native. Teks pada kasus dasar yang didukung tidak boleh dirasterisasi hanya demi menyederhanakan implementasi. Font tidak tersedia/tidak cocok memakai Arial/Calibri sesuai D15 dan wajib menghasilkan warning; perbedaan wrapping harus diuji.
 
 ### Geometri, stacking dan fallback
 
-- Transformasi dihitung relatif terhadap frame slide. Ukuran unit PPTX ditentukan secara konsisten setelah kebijakan ukuran slide dipilih.
+- Transformasi dihitung relatif terhadap frame sumber lalu dinormalisasi proporsional ke kanvas 16:9 (1920×1080 px referensi), dengan padding/background bila rasio berbeda. Unit PPTX dipetakan konsisten tanpa stretch atau crop diam-diam.
 - Auto Layout, constraints, dan resizing behavior tidak direplikasi; snapshot layout akhir menjadi sumber posisi.
-- PNG 2x tidak boleh menyebabkan gambar tampil dua kali lebih besar di slide. Rounding pixel wajib mempertahankan rasio dan bounds visual.
+- PNG default 2x (opsi 1x/3x) tidak boleh mengubah ukuran penempatan gambar di slide. Rounding pixel wajib mempertahankan rasio dan bounds visual.
 - Alpha dipertahankan, tanpa latar putih yang tidak ada di sumber. Efek yang meluas di luar node memerlukan visual bounds yang sesuai agar shadow tidak terpotong.
 - Native objects dan raster ditempatkan mengikuti paint order. Objek native tidak boleh ditambahkan ulang di atas raster yang sudah mencakupnya.
-- Planner harus mendeteksi kasus yang memerlukan backdrop/compositing atau kumpulan objek yang tidak bisa diganti satu raster tanpa mengubah overlap. Kebijakan resolusinya masih OQ02; jangan memakai kebijakan arbitrer secara diam-diam.
+- Planner menggunakan node-level alpha fallback independen sesuai D13. Jika efek membutuhkan backdrop/sibling sehingga node-level fallback tidak setara, laporkan hambatan atau warning eksplisit; jangan diam-diam merasterisasi seluruh frame atau menghilangkan native text.
 - Clipping frame harus dihormati. Frame dengan clipping/non-clipping dan elemen keluar bounds memerlukan fixture terpisah.
 
 ### Local-only dan non-destructive
@@ -141,11 +162,11 @@ Plugin membaca node dan mengekspor bytes tanpa mengubah dokumen. Tidak memakai t
 
 ### Error dan batas kapasitas
 
-Kegagalan font, raster, serialization, node hilang, serta kehabisan kapasitas harus dilaporkan dengan slide/node terkait bila tersedia. Nilai batas jumlah slide, pixel budget, ukuran file, dan waktu proses belum disepakati. Tetapkan melalui benchmark sebelum rilis; jangan menjanjikan ekspor tanpa batas. Ekspor parsial tidak termasuk scope yang disetujui.
+Kegagalan font, raster, serialization, node hilang, serta kehabisan kapasitas harus dilaporkan dengan slide/node terkait bila tersedia. Nilai batas jumlah slide, pixel budget, ukuran file, dan waktu proses belum disepakati (OQ08). Jalankan benchmark 1/10/25/50 slide, lalu tetapkan limit dan target sebelum rilis; jangan menjanjikan ekspor tanpa batas. Ekspor parsial tidak termasuk scope yang disetujui.
 
 ## Acceptance Criteria
 
-Kriteria berikut adalah usulan kontrak penerimaan. Kasus berstatus “menunggu keputusan” belum dapat dipakai untuk mengklaim MVP selesai.
+Kriteria berikut menjadi baseline penerimaan untuk keputusan yang telah disetujui. Angka fidelity adalah target uji, bukan hasil pengukuran; performa dan kapasitas tetap menunggu OQ08.
 
 | ID | Given / When | Then |
 | --- | --- | --- |
@@ -164,43 +185,50 @@ Kriteria berikut adalah usulan kontrak penerimaan. Kasus berstatus “menunggu k
 | AC13 | Traffic plugin dipantau selama ekspor | Tidak ada network request untuk upload/pemrosesan desain atau pengambilan dependency runtime eksternal. |
 | AC14 | Raster/generator gagal | UI menunjukkan gagal dan konteks yang berguna; tidak menyatakan berhasil atau menawarkan hasil yang dianggap lengkap. |
 | AC15 | Tombol ekspor ditekan berulang saat proses berlangsung | Tidak membuat job ganda; progress tetap terkait job aktif. |
-| AC16 | Fixture dibandingkan dengan render Figma pada ukuran yang sama | Geometri, teks, warna, crop, alpha dan stacking diperiksa. Tidak ada missing object, overlap salah, atau clipping tak disengaja. Toleransi kuantitatif dan target aplikasi mengikuti OQ05/OQ06. |
-| AC17 | Frame memiliki ukuran/rasio berbeda | Menunggu OQ01: pengujian harus membuktikan kebijakan yang dipilih tanpa distorsi tak disetujui. |
-| AC18 | Fallback bergantung pada backdrop atau mencakup beberapa sibling | Menunggu OQ02: hasil visual dan batas kehilangan editability harus sesuai kebijakan yang disetujui. |
-| AC19 | Frame memiliki nesting/grouping | Menunggu OQ03: struktur grouping PPTX sesuai keputusan tanpa mengubah z-order atau editability. |
+| AC16 | Fixture dibandingkan dengan render Figma pada ukuran yang sama | Geometri, teks, warna, crop, alpha dan stacking diperiksa. Tidak ada missing object, overlap salah, atau clipping tak disengaja. Toleransi target: posisi/dimensi ±1 px, rotasi ±0,1°, jumlah baris teks sama, SSIM ≥0,98 dengan render konsisten; target aplikasi mengikuti D16. |
+| AC17 | Frame memiliki ukuran/rasio berbeda | Semua halaman/slide 16:9; konten di-fit proporsional dengan padding/background, tanpa stretch atau crop diam-diam (D12). |
+| AC18 | Fallback dan native node overlap atau bergantung pada backdrop | Node-level PNG ber-alpha mempertahankan native text/shape lain; bila compositing independen tidak setara, laporkan hambatan eksplisit (D13). |
+| AC19 | Frame memiliki nesting/grouping | PPTX menggunakan objek flat pada slide level dalam absolute z-order; tidak ada nested PowerPoint shape groups (D14). |
+
+| AC20 | Font asli tidak tersedia | Font Arial/Calibri digunakan; laporan menyebut node, font asli dan font pengganti; wrapping diperiksa (D15). |
+| AC21 | PPTX diuji pada target kompatibilitas | Buka/render/edit pada PowerPoint 2016+ Windows, M365 Windows/Mac, dan import Google Slides; dokumentasikan perbedaan dan kegagalan (D16). |
+| AC22 | Pengguna memilih raster 1x, 2x, atau 3x | PNG sesuai skala, alpha terjaga, posisi dan ukuran fisik tetap; default 2x (OQ07). |
+| AC23 | PDF diekspor dari frame beragam | Satu page 16:9 per frame, urutan sama, visual-first; text selectability diuji jika pipeline mendukung (OQ10). |
+| AC24 | Benchmark kapasitas 1/10/25/50 slide dijalankan | Catat durasi, ukuran file, pixel usage, memory bila terukur, fidelity, editability, dan kegagalan; tetapkan release limits setelah evaluasi (OQ08). |
+| AC25 | Ekspor selesai dan nama file ditentukan | Nama default mengikuti `Frame2Slides_<FirstFrameName>_<YYYYMMDD>` dengan ekstensi sesuai format dan sanitasi nama (OQ09). |
 
 ## Testing Decisions
 
 - Test memeriksa hasil eksternal: urutan, file yang valid, visual, editability, privacy dan integritas sumber; bukan nama fungsi atau detail algoritma.
 - Prior art belum tersedia karena workspace tidak berisi implementasi plugin. Seam ekspor di atas masih usulan dan belum dikonfirmasi pengguna.
 - Fixture minimal: native text termasuk multiline dan mixed runs; rectangle/ellipse/line; frame sederhana; nested Auto Layout; image crop; transparent PNG; native/raster overlap; shadow; mask/clipping; duplicate frame names; invalid selection; font bermasalah; serta ekspor gagal.
-- Gunakan fixture compositing/backdrop, grouping, dan mixed frame sizes setelah OQ01–OQ03 diputuskan.
+- Fixture compositing/backdrop, grouping, dan mixed frame sizes wajib karena D12–D14 sudah diputuskan.
 - Uji struktur PPTX untuk memastikan teks dan shapes native, lalu buka dan edit manual pada target PowerPoint. Valid XML saja tidak membuktikan fidelity atau editability praktis.
-- Render hasil PPTX/PDF dan bandingkan dengan frame Figma pada dimensi yang sama. Perbedaan font dan anti-aliasing harus dinilai terpisah dari kesalahan geometri; ambang penerimaan tidak boleh dikarang.
+- Render hasil PPTX/PDF dan bandingkan dengan frame Figma pada dimensi sama. Gunakan target OQ06 (±1 px geometri, ±0,1° rotasi, line count sama, SSIM ≥0,98); font/antialiasing dinilai terpisah. Angka merupakan target yang belum terbukti.
 - Integrasi Figma memverifikasi snapshot dokumen sebelum/sesudah serta memantau aktivitas jaringan plugin. Jalankan benchmark kapasitas pada desain representatif sebelum menetapkan batas.
 
 ## Out of Scope
 
 Batas berikut diusulkan untuk MVP: publikasi plugin Community, backend/cloud conversion, kolaborasi akun, sinkronisasi balik PowerPoint ke Figma, live link, konversi animasi/prototyping, reflow Auto Layout di PPTX, native editability untuk semua fitur kompleks, editing PDF sebagai objek PowerPoint, serta batch seluruh file tanpa selection.
 
-## Open Questions
+## Open Questions / Decision Status
 
-| ID | Pertanyaan yang belum disepakati | Dampak/opsi untuk diputuskan |
-| --- | --- | --- |
-| OQ01 | Bagaimana ukuran slide berbeda ditangani? | PPTX memiliki ukuran slide pada level presentasi. Pilih menolak ukuran campuran, normalisasi ke target dengan fit/padding, atau memisahkan deck; tentukan target size, alignment dan perilaku PDF secara tersendiri. Tidak ada opsi yang sudah disetujui. |
-| OQ02 | Apa batas fallback compositing? | Node saja, subtree/container, rentang paint order, atau seluruh slide saat diperlukan? Tentukan penanganan blend/backdrop/mask/overlap dan tradeoff terhadap editability. Tidak ada blanket full-slide raster yang disetujui. |
-| OQ03 | Bagaimana grouping hasil PPTX? | Flat objects, hierarchy tertentu, atau grup yang mengikuti Figma? Tentukan frame background, child groups, transformasi, clipping dan grup campuran native/raster. Fixed Layout tidak otomatis menjawab grouping. |
-| OQ04 | Apa kebijakan font dan text styling yang tidak kompatibel? | Tentukan font target, substitusi, warning, raster fallback, serta kebutuhan font di perangkat penerima. |
-| OQ05 | Apa target kompatibilitas? | Tentukan Figma host dan versi/platform PowerPoint serta PDF viewer yang menjadi target acceptance. |
-| OQ06 | Apa ambang visual fidelity? | Sepakati toleransi geometri, wrapping teks, perbedaan render, dan daftar fixture wajib; belum ada angka yang disetujui. |
-| OQ07 | Apakah skala raster dapat diubah pengguna? | Default 2x terkunci; pilihan tambahan, batas dan UI belum disetujui. |
-| OQ08 | Apa batas kapasitas dan target performa? | Jumlah slide, pixel budget, ukuran file, waktu ekspor, dan perilaku saat batas terlampaui memerlukan benchmark. |
-| OQ09 | Bagaimana distribusi privat dan penamaan file? | Tentukan sideload/internal distribution, update, serta nama file/default export settings. |
-| OQ10 | Bagaimana kualitas dan teknik PDF? | PDF berada di MVP, tetapi raster/vector composition, text selectability, dan alpha/background page belum dikunci. |
-| OQ11 | Apakah ada keputusan tambahan pada isi diskusi yang belum tersedia? | Rekonsiliasi dengan ekspor percakapan lengkap sebelum menyebut PRD sebagai ekstraksi seluruh diskusi. |
+| ID | Pertanyaan | Status | Keputusan / tindak lanjut |
+| --- | --- | --- | --- |
+| OQ01 | Ukuran slide berbeda | LOCKED (D12) | 16:9 Widescreen 1920×1080 px; proportional fit tanpa distorsi/crop diam-diam. |
+| OQ02 | Batas fallback compositing | LOCKED (D13) | Independent node-level PNG alpha; native text di bawah tetap editable; keterbatasan backdrop dilaporkan. |
+| OQ03 | Grouping PPTX | LOCKED (D14) | Flatten objects pada slide level mengikuti absolute z-order. |
+| OQ04 | Font tidak kompatibel | LOCKED (D15) | Fallback Arial/Calibri dan warning report. |
+| OQ05 | Kompatibilitas | LOCKED (D16) | PowerPoint Desktop 2016+ Windows/M365 Windows & Mac, Google Slides, PDF universal; perlu uji. |
+| OQ06 | Visual fidelity | APPROVED | ±1 px geometri, ±0,1° rotasi, wrapping setara, target SSIM ≥0,98 dan fixture wajib. |
+| OQ07 | Skala raster | APPROVED | PNG lossless alpha 1x/2x/3x; default 2x. |
+| OQ08 | Kapasitas dan performa | BENCHMARK PENDING | Benchmark 1/10/25/50 slide; limit dan target final setelah pengukuran. |
+| OQ09 | Distribusi privat dan nama file | APPROVED | Development Plugin, Git/local build, `Frame2Slides_<FirstFrameName>_<YYYYMMDD>.<ext>`. |
+| OQ10 | PDF | APPROVED | Visual-first 16:9; text selectable bila didukung; metode final setelah proof-of-concept. |
+| OQ11 | Kelengkapan diskusi | OPEN | Rekonsiliasi terhadap percakapan lengkap belum dilakukan. |
 
 ## Further Notes
 
-Urutan implementasi yang diusulkan: selection/order dan snapshot → native text/shapes dengan frame berukuran sama → raster independen dan z-order → PDF/PPTX output serta laporan → integrasi, visual QA, dan benchmark. Selesaikan OQ01–OQ03 sebelum mengimplementasikan perilaku terkait atau menyatakan MVP siap rilis.
+Urutan implementasi: selection/order dan snapshot → normalisasi kanvas 16:9 serta native text/shapes → raster independen dan flattened z-order → PDF/PPTX output serta laporan → integrasi, visual QA, kompatibilitas, dan benchmark. D12–D16 sudah locked; OQ08 menjadi release gate benchmark dan OQ11 tetap open.
 
 Definisi selesai: acceptance criteria yang berlaku lulus pada target yang disepakati, keputusan yang menghalangi MVP terselesaikan, keluaran native terbukti dapat diedit, fidelity diverifikasi, dan local-only/non-destructive terbukti. Dokumen ini tidak mengklaim implementasi atau pengujian sudah dilakukan.
