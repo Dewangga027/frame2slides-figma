@@ -1,0 +1,13 @@
+
+{
+  "name": "Frame2Slides",
+  "id": "frame2slides-dev",
+  "api": "1.0.0",
+  "main": "dist/plugin.js",
+  "ui": "dist/index.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  }
+}

@@ -1,4 +1,5 @@
-
+import { useEffect, useState } from "react";
+import type { PluginToUIMessage, UIToPluginMessage } from "../shared/messages";
 import "./style.css";
 
 const sampleFrames = [
@@ -7,6 +8,32 @@ const sampleFrames = [
 ];
 
 export default function App() {
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    const handleMessage = (
+      event: MessageEvent<{ pluginMessage?: PluginToUIMessage }>,
+    ) => {
+      const message = event.data?.pluginMessage;
+
+      if (message?.type === "PLUGIN_READY") {
+        setConnected(true);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    const readyMessage: UIToPluginMessage = {
+      type: "UI_READY",
+    };
+
+    parent.postMessage({ pluginMessage: readyMessage }, "*");
+
+    return () => {
+      window.removeEventListener("message", handleMessage);
+    };
+  }, []);
+
   return (
     <main className="app">
       <header className="app-header">
@@ -16,6 +43,10 @@ export default function App() {
         </div>
         <span className="version">v0.1.0</span>
       </header>
+
+      <span className="connection-status">
+        {connected ? "Connected" : "Waiting for Figma"}
+      </span>
 
       <section className="section">
         <div className="section-heading">
