@@ -66,19 +66,31 @@ describe("Figma UI handshake", () => {
     expect(container.querySelector('[role="alert"]')).not.toBeNull();
   });
 
-  it("does not connect on malformed bridge messages or messages from another window", async () => {
+  it("connects when the host delivers directly through the documented onmessage callback", async () => {
+    await act(async () => {
+      window.onmessage?.call(window, new MessageEvent("message", { data: { pluginMessage: ready } }));
+    });
+    expect(loadButton().disabled).toBe(false);
+  });
+
+  it("accepts validated host-forwarded messages without assuming immediate parent identity", async () => {
+    const relay = document.createElement("iframe");
+    document.body.appendChild(relay);
+    try {
+      const source = relay.contentWindow;
+      if (!source) throw new Error("Host relay has no window");
+      await receive(ready, source);
+      expect(loadButton().disabled).toBe(false);
+    } finally {
+      relay.remove();
+    }
+  });
+
+  it("does not connect on malformed bridge payloads", async () => {
     await receive({ type: "PLUGIN_READY", payload: { pluginName: "Frame2Slides" } });
     expect(loadButton().disabled).toBe(true);
-    const unrelated = document.createElement("iframe");
-    document.body.appendChild(unrelated);
-    try {
-      const source = unrelated.contentWindow;
-      if (!source) throw new Error("Unrelated frame has no window");
-      await receive(ready, source);
-      expect(loadButton().disabled).toBe(true);
-    } finally {
-      unrelated.remove();
-    }
+    await receive({ type: "PLUGIN_READY", payload: { pluginName: 42, version: "1.0.0" } });
+    expect(loadButton().disabled).toBe(true);
     await receive(ready);
     expect(loadButton().disabled).toBe(false);
   });

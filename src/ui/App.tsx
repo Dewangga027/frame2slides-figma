@@ -198,8 +198,6 @@ export default function App() {
   useEffect(() => {
     mounted.current = true;
     const handleMessage = (event: MessageEvent<unknown>) => {
-      // Native bridge events may have no Window source; check sender identity when available.
-      if (event.source !== null && event.source !== window.parent) return;
       if (!event.data || typeof event.data !== "object" || !("pluginMessage" in event.data)) return;
       const message = event.data.pluginMessage;
       if (!isPluginMessage(message)) return;
@@ -268,11 +266,12 @@ export default function App() {
         }
       }
     };
-    window.addEventListener("message", handleMessage);
+    const previousOnMessage = window.onmessage;
+    window.onmessage = handleMessage;
     send({ type: "UI_READY" });
     return () => {
       mounted.current = false;
-      window.removeEventListener("message", handleMessage);
+      if (window.onmessage === handleMessage) window.onmessage = previousOnMessage;
       thumbnailUrls.current.forEach((url) => URL.revokeObjectURL(url));
       downloadUrls.current.forEach((timer, url) => {
         window.clearTimeout(timer);
