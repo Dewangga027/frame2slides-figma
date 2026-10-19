@@ -198,7 +198,9 @@ export default function App() {
   useEffect(() => {
     mounted.current = true;
     const handleMessage = (event: MessageEvent<unknown>) => {
-      if (event.source !== window.parent || !event.data || typeof event.data !== "object" || !("pluginMessage" in event.data)) return;
+      // Native bridge events may have no Window source; check sender identity when available.
+      if (event.source !== null && event.source !== window.parent) return;
+      if (!event.data || typeof event.data !== "object" || !("pluginMessage" in event.data)) return;
       const message = event.data.pluginMessage;
       if (!isPluginMessage(message)) return;
       if (message.type === "PLUGIN_READY") {

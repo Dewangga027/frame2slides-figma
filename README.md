@@ -17,6 +17,8 @@ In Figma Desktop, open **Plugins → Development → Import plugin from manifest
 
 After source updates, rebuild and reopen the development plugin. `npm run dev` previews the UI only: a normal browser does not provide the Figma API or a selection.
 
+**Load selected frames** is enabled only after the plugin handshake completes (and while no job is running), not merely when a frame is selected. If it remains disabled with **Waiting for Figma**, close and reopen the plugin after rebuilding; selection changes cannot repair a disconnected UI.
+
 ## Export workflow
 
 1. Select one or more **frames** in Figma, then open the plugin.
@@ -68,9 +70,11 @@ Runtime libraries are bundled into the plugin UI. `networkAccess.allowedDomains`
 
 ## Verification and release gates
 
-`npm run typecheck`, **15 behavior tests** in `npm test`, and `npm run build` pass. Tests cover editable native file objects, ordered output, 16:9 fit, scale-independent placement, mixed styles/alpha/rotation, invalid and blocked outputs, duplicate frame names, hidden/nested geometry, mask fallback, font substitution, source-change rejection and job locking.
+`npm run typecheck`, **18 behavior tests** in `npm test`, and `npm run build` pass. Tests cover editable native file objects, ordered output, 16:9 fit, scale-independent placement, mixed styles/alpha/rotation, invalid and blocked outputs, duplicate frame names, hidden/nested geometry, mask fallback, font substitution, source-change rejection, job locking and UI handshake/selection-error recovery.
 
 A real local smoke run generated PPTX/PDF and exercised the actual browser UI (selection, button and drag reordering, repeated activation, preflight failure, corrupt-asset failure, downloads and recovery). A second run loaded both **production bundles** (`dist/plugin.js` and `dist/index.html`) in an iframe host: real adapter → native/raster snapshot → writer → PPTX/PDF and JSON downloads, with no HTTP requests observed during export. The host supplies Figma-shaped read/export fixtures, not a live Figma document; this is not live-document Figma verification.
+
+The handshake regression rejected valid `pluginMessage` events with `MessageEvent.source === null`. The UI now accepts these bridge events while retaining payload validation, request/job correlation and rejection of other non-parent Window sources; the [documented Figma receive contract](https://developers.figma.com/docs/plugins/creating-ui/#sending-a-message-from-the-plugin-code-to-the-ui) does not require parent Window identity. Regression tests failed before the fix and pass afterward. A production-UI browser smoke with injected sourceless bridge events enabled **Load selected frames**, displayed a frame/thumbnail and enabled export without console errors. This simulates native transport; live Figma bridge delivery remains unverified.
 
 The writer-only fixture opened in installed **PowerPoint 16.0** in C–A–B order, with three objects per slide. The production-bundle download also opened in C–A–B order, with four objects per slide (background, native rectangle, PNG, native text). Both used a 720×405-point canvas; native text was edited, saved and rendered to PNG by PowerPoint. The generated three-page PDF rendered in Chromium's PDF viewer. This proves those fixture paths, not every target/application/design combination.
 
