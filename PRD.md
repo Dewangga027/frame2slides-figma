@@ -114,7 +114,7 @@ State yang diperlukan: daftar kosong, siap, preflight, ekspor berlangsung, berha
 
 ### Seams dan tanggung jawab modul
 
-Implementasi plugin sedang berjalan secara bertahap; status pengujian codebase tidak diverifikasi oleh dokumen ini. Usulan seam utama adalah **permintaan ekspor berisi snapshot frame berurutan → file keluaran dan laporan konversi**. UI dan integrasi Figma diuji pada batas yang sama melalui fixture integrasi; unit test internal hanya untuk algoritma yang membutuhkan diagnosis khusus.
+Implementasi tersedia pada `src/plugin`, `src/export`, dan `src/ui`, dengan kontrak snapshot di `src/shared/scene.ts`. Seam utama adalah **permintaan ekspor berisi snapshot frame berurutan → file keluaran dan laporan konversi**. Fixture integrasi menguji adapter dan file keluaran pada batas tersebut. Bukti smoke, batas dukungan, dan release gate yang belum lulus dicatat di [README.md](README.md); keberadaan kode tidak menyatakan seluruh acceptance criteria sudah lulus.
 
 Tanggung jawab logis:
 
@@ -200,7 +200,7 @@ Kriteria berikut menjadi baseline penerimaan untuk keputusan yang telah disetuju
 ## Testing Decisions
 
 - Test memeriksa hasil eksternal: urutan, file yang valid, visual, editability, privacy dan integritas sumber; bukan nama fungsi atau detail algoritma.
-- Prior art belum tersedia karena workspace tidak berisi implementasi plugin. Seam ekspor di atas masih usulan dan belum dikonfirmasi pengguna.
+- Kontrak scene dan laporan sudah diimplementasikan di `src/shared/scene.ts`, dengan protokol job di `src/shared/messages.ts`. Fixture Figma-shaped menguji konversi hingga struktur file; validasi dokumen Figma nyata tetap dibedakan dari fixture.
 - Fixture minimal: native text termasuk multiline dan mixed runs; rectangle/ellipse/line; frame sederhana; nested Auto Layout; image crop; transparent PNG; native/raster overlap; shadow; mask/clipping; duplicate frame names; invalid selection; font bermasalah; serta ekspor gagal.
 - Fixture compositing/backdrop, grouping, dan mixed frame sizes wajib karena D12–D14 sudah diputuskan.
 - Uji struktur PPTX untuk memastikan teks dan shapes native, lalu buka dan edit manual pada target PowerPoint. Valid XML saja tidak membuktikan fidelity atau editability praktis.
@@ -231,4 +231,4 @@ Batas berikut diusulkan untuk MVP: publikasi plugin Community, backend/cloud con
 
 Urutan implementasi: selection/order dan snapshot → normalisasi kanvas 16:9 serta native text/shapes → raster independen dan flattened z-order → PDF/PPTX output serta laporan → integrasi, visual QA, kompatibilitas, dan benchmark. D12–D16 sudah locked; OQ08 menjadi release gate benchmark dan OQ11 tetap open.
 
-Definisi selesai: acceptance criteria yang berlaku lulus pada target yang disepakati, keputusan yang menghalangi MVP terselesaikan, keluaran native terbukti dapat diedit, fidelity diverifikasi, dan local-only/non-destructive terbukti. Dokumen ini tidak mengklaim implementasi atau pengujian sudah dilakukan.
+Definisi selesai: acceptance criteria yang berlaku lulus pada target yang disepakati, keputusan yang menghalangi MVP terselesaikan, keluaran native terbukti dapat diedit, fidelity diverifikasi, dan local-only/non-destructive terbukti. Smoke PowerPoint lokal, PDF viewer, dan UI sudah dicatat di README; fidelity Figma-reference, matriks target lengkap, benchmark representatif OQ08, dan rekonsiliasi OQ11 belum dinyatakan lulus.
